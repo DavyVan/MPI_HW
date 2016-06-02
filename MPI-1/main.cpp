@@ -5,15 +5,14 @@
 #include <stdlib.h>
 #include <fstream>
 #include <sys/time.h>
-#include <mpich-mp/mpi.h>
+#include <mpi.h>
 
 #define epsilon 1.e-8
-#define MASTER 0        //主进程rank
+#define MASTER 0        //MASTER进程的rank编号
 
 using namespace std;
 
 int main(int argc, char *argv[]) {
-    //检查MPI进程数量,
 
     int M, N;
 
@@ -25,7 +24,6 @@ int main(int argc, char *argv[]) {
     timeval start, end, end2;
 
     if (argc > 3) {
-
         T = argv[3];
         if (argc > 4) {
             P = argv[4];
@@ -36,136 +34,202 @@ int main(int argc, char *argv[]) {
     }
     // cout<<T<<P<<endl;
 
-    //二维链表结构不适合MPI传输数据,所以声明U_t为一维数组
     //double **U_t;
     double *U_t;
-    double alpha, beta, gamma, **Alphas, **Betas, **Gammas;
+    //double alpha, beta, gamma, **Alphas, **Betas, **Gammas;
+    double alpha, beta, gamma, *Alphas, *Betas, *Gammas;
 
     int acum = 0;
     int temp1, temp2;
 
-
-    U_t = new double [M * N];       //这里给整个矩阵申请内存空间
-    Alphas = new double *[M];
-    Betas = new double *[M];
-    Gammas = new double *[M];
-
-    for (int i = 0; i < N; i++) {
-        //U_t[i] = new double[N];
-        Alphas[i] = new double[N];
-        Betas[i] = new double[N];
-        Gammas[i] = new double[N];
-    }
-
-
-    //Read from file matrix, if not available, app quit
-    //Already transposed
-
-    ifstream matrixfile("matrix");
-    if (!(matrixfile.is_open())) {
-        cout << "Error: file not found" << endl;
+    /*
+     * 这里需要说明:
+     * 我们假设这个算法没有编写错误,不修改原算法
+     * 所以按照这个算法的隐藏条件,M必须小于等于N才行,否则会引起崩溃
+     * */
+    if (M > N)
+    {
+        cout << "M must smaller than N, or the original algorithm will go crash!" << endl;
         return 0;
     }
 
-    for (int i = 0; i < M; i++) {
-        for (int j = 0; j < N; j++) {
-            //matrixfile >> U_t[i][j];
-            matrixfile >> U_t[i * N + j];
+    //声明为数组对于数据传递更方便
+    U_t = new double[N * N];
+    Alphas = new double[N * N];
+    Betas = new double[N * N];
+    Gammas = new double[N * N];
+
+
+    MPI_Init(&argc, &argv);
+    int rank, rank_size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &rank_size);
+
+    //Read from file matrix, if not available, app quit
+    //Already transposed
+    //Only MASTER rank can read the file and initialize U_t
+    if (rank == MASTER)
+    {
+        ifstream matrixfile("matrix");
+        if(!(matrixfile.is_open())){
+            cout<<"Error: file not found"<<endl;
+            return 0;
+        }
+
+        for(int i = 0; i < M; i++){
+            for(int j =0; j < N; j++){
+                //matrixfile >> U_t[i][j];
+                matrixfile >> U_t[i * N + j];
+            }
+        }
+
+        matrixfile.close();
+    }
+
+    //分发数据
+    MPI_Bcast(U_t, N * N, MPI_INT, MASTER, MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);    //同步所有进程,确保每个进程都拿到了数据之后在进行下一步
+
+    //每个rank计算几行,乘回去会大于M
+    int rowPerRank = (M + rank_size - 1) / rank_size;
+
+    MPI_Request *requests_a = new MPI_Request[rank_size];
+    MPI_Request *requests_b = new MPI_Request[rank_size];
+    MPI_Request *requests_g = new MPI_Request[rank_size];
+    //主进程异步收集数据
+    if (rank == MASTER)
+    {
+        int _size = rowPerRank * M;     //每次接收的数据量/每个进程会发送的数据量
+        for(int i = 1; i < rank_size; i++)      //自己的不用收集,所以i从1开始
+        {
+            MPI_Irecv(&Alphas[i * _size], _size, MPI_DOUBLE, i, 1, MPI_COMM_WORLD, &requests_a[i]);
+            MPI_Irecv(&Betas[i * _size], _size, MPI_DOUBLE, i, 2, MPI_COMM_WORLD, &requests_b[i]);
+            MPI_Irecv(&Gammas[i * _size], _size, MPI_DOUBLE, i, 3, MPI_COMM_WORLD, &requests_g[i]);
         }
     }
 
-    matrixfile.close();
-
-    /*分发数据*/
-    MPI_Bcast(&U_t, M * N, MPI_INT, MASTER, MPI_COMM_WORLD);
-
-    /* Reductions */
+    /* Reductions 所有进程都参与计算*/
 
     gettimeofday(&start, NULL);
     double conv;
-    for (int i = 0; i < M; i++) {        //convergence
-
-        for (int j = 0; j < M; j++) {
-
-            alpha = 0.0;
-            beta = 0.0;
-            gamma = 0.0;
-            for (int k = 0; k < N; k++) {
-                /*alpha = alpha + (U_t[i][k] * U_t[i][k]);
-                beta = beta + (U_t[j][k] * U_t[j][k]);
-                gamma = gamma + (U_t[i][k] * U_t[j][k]);*/
-                alpha = alpha + (U_t[i * N + k] * U_t[i * N + k]);
-                beta = beta + (U_t[j * N + k] * U_t[j * N + k]);
-                gamma = gamma + (U_t[i * N + k] * U_t[j * N + k]);
+    /*
+     * 把最外层循环拆开(即i循环)
+     * 这样可以对应将Alphas/Betas/Gammas按照行分成若干部分,便于最后汇总数据
+     * */
+    for (int i = rank * rowPerRank; i < (rank + 1) * rowPerRank; i++)
+    {
+        if (i < M)
+        {
+            for(int j = 0; j < M; j++)
+            {
+                alpha = 0.0;
+                beta = 0.0;
+                gamma = 0.0;
+                for (int k = 0; k < N; k++)
+                {
+                    alpha += U_t[i * N + k] * U_t[i * N + k];
+                    beta += U_t[j * N + k] * U_t[j * N + k];
+                    gamma += U_t[i * N + k] * U_t[i * N + k];
+                }
+                //三个结果矩阵视作M*M的矩阵,为了让行与行之间能在内存中连续存储,读取会更高效
+                Alphas[i * M + j] = alpha;
+                Betas[i * M + j] = beta;
+                Gammas[i * M + j] = gamma;
             }
-            Alphas[i][j] = alpha;
-            Betas[i][j] = beta;
-            Gammas[i][j] = gamma;
         }
     }
 
-    gettimeofday(&end, NULL);
+    //除了主进程之外所有进程都要把数据发送给主进程,使用同步send函数即可;主进程则需要等待所有进程传输完毕
+    if (rank != MASTER)
+    {
+        MPI_Request *a, *b, *c;
+        int _size = rowPerRank * M;
+        if (rank != rank_size - 1)      //如果不是最后一个进程,最后一个进程因为可能会有一部分是大于M的行
+        {
+            MPI_Isend(&Alphas[rank * _size], _size, MPI_DOUBLE, MASTER, 1, MPI_COMM_WORLD, a);
+            MPI_Isend(&Betas[rank * _size], _size, MPI_DOUBLE, MASTER, 2, MPI_COMM_WORLD, b);
+            MPI_Isend(&Gammas[rank * _size], _size, MPI_DOUBLE, MASTER, 3, MPI_COMM_WORLD, c);
+        }
+        else if (rank == rank_size - 1)     //最后一个进程
+        {
+            int __size = (M - rank * rowPerRank) * M;
+            MPI_Isend(&Alphas[rank * _size], __size, MPI_DOUBLE, MASTER, 1, MPI_COMM_WORLD, a);
+            MPI_Isend(&Betas[rank * _size], __size, MPI_DOUBLE, MASTER, 2, MPI_COMM_WORLD, b);
+            MPI_Isend(&Gammas[rank * _size], __size, MPI_DOUBLE, MASTER, 3, MPI_COMM_WORLD, c);
+        }
 
-// fix final result
+        //等待发送结束就可以退出了
+        MPI_Wait(a, MPI_STATUS_IGNORE);
+        MPI_Wait(b, MPI_STATUS_IGNORE);
+        MPI_Wait(c, MPI_STATUS_IGNORE);
+
+        //从属进程退出
+        cout << "Process " << rank << " exit!" << endl;
+        MPI_Finalize();
+        return 0;
+    }
+
+    //等待主进程收集完所有数据之后继续
+    MPI_Waitall(rank_size, requests_a, MPI_STATUS_IGNORE);
+    MPI_Waitall(rank_size, requests_b, MPI_STATUS_IGNORE);
+    MPI_Waitall(rank_size, requests_g, MPI_STATUS_IGNORE);
+
+    gettimeofday(&end, NULL);
 
 
     //Output time and iterations
-
     if (T == "-t" || P == "-t") {
         elapsedTime = (end.tv_sec - start.tv_sec) * 1000.0;
         elapsedTime += (end.tv_usec - start.tv_usec) / 1000.0;
         cout << "Time: " << elapsedTime << " ms." << endl << endl;
-
-
     }
-
 
     // Output the matrixes for debug
     if (T == "-p" || P == "-p") {
         cout << "Alphas" << endl << endl;
-        for (int i = 0; i < M; i++) {
-
-            for (int j = 0; j < N; j++) {
-
-                cout << Alphas[i][j] << "  ";
+        for (int i = 0; i < M; i++)
+        {
+            for (int j = 0; j < N; j++)
+            {
+                cout << Alphas[i * M + j] << "  ";
             }
             cout << endl;
         }
 
         cout << endl << "Betas" << endl << endl;
-        for (int i = 0; i < M; i++) {
-
-            for (int j = 0; j < N; j++) {
-                cout << Betas[i][j] << "  ";
+        for (int i = 0; i < M; i++)
+        {
+            for (int j = 0; j < N; j++)
+            {
+                cout << Betas[i * M + j] << "  ";
             }
             cout << endl;
         }
 
         cout << endl << "Gammas" << endl << endl;
-        for (int i = 0; i < M; i++) {
-            for (int j = 0; j < N; j++) {
-
-                cout << Gammas[i][j] << "  ";
-
+        for (int i = 0; i < M; i++)
+        {
+            for (int j = 0; j < N; j++)
+            {
+                cout << Gammas[i * M + j] << "  ";
             }
             cout << endl;
         }
-
     }
 
     //Generate files for debug purpouse
-    if (Db == "-d" || T == "-d" || P == "-d") {
-
-
+    if (Db == "-d" || T == "-d" || P == "-d")
+    {
         ofstream Af;
         //file for Matrix A
         Af.open("Alphas.mat");
-/*    Af<<"# Created from debug\n# name: A\n# type: matrix\n# rows: "<<M<<"\n# columns: "<<N<<"\n";*/
 
         Af << M << "  " << N;
-        for (int i = 0; i < M; i++) {
-            for (int j = 0; j < N; j++) {
-                Af << " " << Alphas[i][j];
+        for (int i = 0; i < M; i++)
+        {
+            for (int j = 0; j < N; j++)
+            {
+                Af << " " << Alphas[i * M + j];
             }
             Af << "\n";
         }
@@ -176,11 +240,12 @@ int main(int argc, char *argv[]) {
 
         //File for Matrix U
         Uf.open("Betas.mat");
-/*    Uf<<"# Created from debug\n# name: Ugpu\n# type: matrix\n# rows: "<<M<<"\n# columns: "<<N<<"\n";*/
 
-        for (int i = 0; i < M; i++) {
-            for (int j = 0; j < N; j++) {
-                Uf << " " << Betas[i][j];
+        for (int i = 0; i < M; i++)
+        {
+            for (int j = 0; j < N; j++)
+            {
+                Uf << " " << Betas[i * M + j];
             }
             Uf << "\n";
         }
@@ -189,11 +254,12 @@ int main(int argc, char *argv[]) {
         ofstream Vf;
         //File for Matrix V
         Vf.open("Gammas.mat");
-/*    Vf<<"# Created from debug\n# name: Vgpu\n# type: matrix\n# rows: "<<M<<"\n# columns: "<<N<<"\n";*/
 
-        for (int i = 0; i < M; i++) {
-            for (int j = 0; j < N; j++) {
-                Vf << " " << Gammas[i][j];
+        for (int i = 0; i < M; i++)
+        {
+            for (int j = 0; j < N; j++)
+            {
+                Vf << " " << Gammas[i * M + j];
             }
             Vf << "\n";
         }
@@ -202,21 +268,13 @@ int main(int argc, char *argv[]) {
         Vf.close();
 
         ofstream Sf;
-
-
     }
 
-    for (int i = 0; i < N; i++) {
-        delete[] Alphas[i];
-        delete[] U_t[i];
-        delete[] Betas[i];
-        delete[] Gammas[i];
-
-    }
     delete[] Alphas;
     delete[] Betas;
     delete[] Gammas;
     delete[] U_t;
 
+    MPI_Finalize();
     return 0;
 }
