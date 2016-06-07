@@ -2,6 +2,7 @@
 #include <fstream>
 #include <stdio.h>
 #include <stdlib.h>
+#include <cmath>
  
 #define epsilon 1.e-8
 
@@ -120,6 +121,7 @@ int main(int argc, char* argv[]){
 			rBmpi += (abs(Bmpi[i][j]));
 			rGmpi += (abs(Gmpi[i][j]));
 		}
+
 	}
 	resA = rAcpu - rAmpi;
 	resB = rBcpu - rBmpi;

@@ -58,18 +58,22 @@ int main(int argc, char *argv[]) {
     Alphas = new double[N * N];
     Betas = new double[N * N];
     Gammas = new double[N * N];
+    printf("Arrayes[%d^2] initialized!\n", N);
 
 
     MPI_Init(&argc, &argv);
     int rank, rank_size;
+    //MPI_Barrier(MPI_COMM_WORLD);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &rank_size);
+    printf("rank: %d size: %d\n", rank, rank_size);
 
     //Read from file matrix, if not available, app quit
     //Already transposed
     //Only MASTER rank can read the file and initialize U_t
     if (rank == MASTER)
     {
+        cout << "Preparing to read file 'matrix'...\n";
         ifstream matrixfile("matrix");
         if(!(matrixfile.is_open())){
             cout<<"Error: file not found"<<endl;
@@ -84,34 +88,46 @@ int main(int argc, char *argv[]) {
         }
 
         matrixfile.close();
+        printf("Read file 'matrix' completed!\n");
     }
 
     //分发数据
-    MPI_Bcast(U_t, N * N, MPI_INT, MASTER, MPI_COMM_WORLD);
-    MPI_Barrier(MPI_COMM_WORLD);    //同步所有进程,确保每个进程都拿到了数据之后在进行下一步
+    printf("@@@ %d @@@ Before Broadcast...\n", rank);
+    MPI_Bcast(U_t, N * N, MPI_DOUBLE, MASTER, MPI_COMM_WORLD);
+    printf("@@@ %d @@@ Broadcasting...\n", rank);
+    //MPI_Barrier(MPI_COMM_WORLD);    //同步所有进程,确保每个进程都拿到了数据之后在进行下一步
+    printf("@@@ %d @@@ Broadcasted!\n", rank);
 
     //每个rank计算几行,乘回去会大于M
     int rowPerRank = (M + rank_size - 1) / rank_size;
+    printf("@@@ %d @@@ rowPerRank = %d\n", rank, rowPerRank);
 
-    MPI_Request *requests_a = new MPI_Request[rank_size];
-    MPI_Request *requests_b = new MPI_Request[rank_size];
-    MPI_Request *requests_g = new MPI_Request[rank_size];
+    MPI_Request *requests_a;
+    MPI_Request *requests_b;
+    MPI_Request *requests_g;
+    requests_a = new MPI_Request[rank_size];
+    requests_b = new MPI_Request[rank_size];
+    requests_g = new MPI_Request[rank_size];
     //主进程异步收集数据
     if (rank == MASTER)
     {
+        printf("@@@ %d @@@ before set Irecv\n", rank);
         int _size = rowPerRank * M;     //每次接收的数据量/每个进程会发送的数据量
         for(int i = 1; i < rank_size; i++)      //自己的不用收集,所以i从1开始
         {
+            printf("@@@ %d @@@ setting Irecv for %d\n", rank, i);
             MPI_Irecv(&Alphas[i * _size], _size, MPI_DOUBLE, i, 1, MPI_COMM_WORLD, &requests_a[i]);
             MPI_Irecv(&Betas[i * _size], _size, MPI_DOUBLE, i, 2, MPI_COMM_WORLD, &requests_b[i]);
             MPI_Irecv(&Gammas[i * _size], _size, MPI_DOUBLE, i, 3, MPI_COMM_WORLD, &requests_g[i]);
+            printf("@@@ %d @@@ Irecv for %d set!\n", rank, i);
         }
+        printf("@@@ %d @@@ set Irecv!\n", rank);
     }
 
     /* Reductions 所有进程都参与计算*/
 
+    printf("@@@ %d @@@ Start computing...\n", rank);
     gettimeofday(&start, NULL);
-    double conv;
     /*
      * 把最外层循环拆开(即i循环)
      * 这样可以对应将Alphas/Betas/Gammas按照行分成若干部分,便于最后汇总数据
@@ -138,41 +154,48 @@ int main(int argc, char *argv[]) {
             }
         }
     }
+    printf("@@@ %d @@@ End computing!\n", rank);
 
     //除了主进程之外所有进程都要把数据发送给主进程,使用同步send函数即可;主进程则需要等待所有进程传输完毕
     if (rank != MASTER)
     {
-        MPI_Request *a, *b, *c;
+        printf("@@@ %d @@@ before send data\n", rank);
+        MPI_Request a, b, c;
         int _size = rowPerRank * M;
+        printf("@@@ %d @@@ _size = %d\n", rank, _size);
         if (rank != rank_size - 1)      //如果不是最后一个进程,最后一个进程因为可能会有一部分是大于M的行
         {
-            MPI_Isend(&Alphas[rank * _size], _size, MPI_DOUBLE, MASTER, 1, MPI_COMM_WORLD, a);
-            MPI_Isend(&Betas[rank * _size], _size, MPI_DOUBLE, MASTER, 2, MPI_COMM_WORLD, b);
-            MPI_Isend(&Gammas[rank * _size], _size, MPI_DOUBLE, MASTER, 3, MPI_COMM_WORLD, c);
+            MPI_Isend(&Alphas[1 * _size], _size, MPI_DOUBLE, MASTER, 1, MPI_COMM_WORLD, &a);
+            MPI_Isend(&Betas[1 * _size], _size, MPI_DOUBLE, MASTER, 2, MPI_COMM_WORLD, &b);
+            MPI_Isend(&Gammas[1 * _size], _size, MPI_DOUBLE, MASTER, 3, MPI_COMM_WORLD, &c);
         }
         else if (rank == rank_size - 1)     //最后一个进程
         {
             int __size = (M - rank * rowPerRank) * M;
-            MPI_Isend(&Alphas[rank * _size], __size, MPI_DOUBLE, MASTER, 1, MPI_COMM_WORLD, a);
-            MPI_Isend(&Betas[rank * _size], __size, MPI_DOUBLE, MASTER, 2, MPI_COMM_WORLD, b);
-            MPI_Isend(&Gammas[rank * _size], __size, MPI_DOUBLE, MASTER, 3, MPI_COMM_WORLD, c);
+            MPI_Isend(&Alphas[1 * _size], __size, MPI_DOUBLE, MASTER, 1, MPI_COMM_WORLD, &a);
+            MPI_Isend(&Betas[1 * _size], __size, MPI_DOUBLE, MASTER, 2, MPI_COMM_WORLD, &b);
+            MPI_Isend(&Gammas[1 * _size], __size, MPI_DOUBLE, MASTER, 3, MPI_COMM_WORLD, &c);
         }
+        printf("@@@ %d @@@ sending data\n", rank);
 
         //等待发送结束就可以退出了
-        MPI_Wait(a, MPI_STATUS_IGNORE);
-        MPI_Wait(b, MPI_STATUS_IGNORE);
-        MPI_Wait(c, MPI_STATUS_IGNORE);
+        MPI_Wait(&a, MPI_STATUS_IGNORE);
+        MPI_Wait(&b, MPI_STATUS_IGNORE);
+        MPI_Wait(&c, MPI_STATUS_IGNORE);
 
         //从属进程退出
-        cout << "Process " << rank << " exit!" << endl;
+        printf("@@@ %d @@@ exit!\n", rank);
         MPI_Finalize();
         return 0;
     }
 
     //等待主进程收集完所有数据之后继续
-    MPI_Waitall(rank_size, requests_a, MPI_STATUS_IGNORE);
-    MPI_Waitall(rank_size, requests_b, MPI_STATUS_IGNORE);
-    MPI_Waitall(rank_size, requests_g, MPI_STATUS_IGNORE);
+    if (rank_size > 1)
+    {
+        MPI_Waitall(rank_size, requests_a, MPI_STATUS_IGNORE);
+        MPI_Waitall(rank_size, requests_b, MPI_STATUS_IGNORE);
+        MPI_Waitall(rank_size, requests_g, MPI_STATUS_IGNORE);
+    }
 
     gettimeofday(&end, NULL);
 
@@ -222,7 +245,7 @@ int main(int argc, char *argv[]) {
     {
         ofstream Af;
         //file for Matrix A
-        Af.open("Alphas.mat");
+        Af.open("AlphasMPI.mat");
 
         Af << M << "  " << N;
         for (int i = 0; i < M; i++)
@@ -239,7 +262,7 @@ int main(int argc, char *argv[]) {
         ofstream Uf;
 
         //File for Matrix U
-        Uf.open("Betas.mat");
+        Uf.open("BetasMPI.mat");
 
         for (int i = 0; i < M; i++)
         {
@@ -253,7 +276,7 @@ int main(int argc, char *argv[]) {
 
         ofstream Vf;
         //File for Matrix V
-        Vf.open("Gammas.mat");
+        Vf.open("GammasMPI.mat");
 
         for (int i = 0; i < M; i++)
         {
