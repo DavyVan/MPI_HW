@@ -12,14 +12,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="2618ab0e-8e54-4647-80a3-68e6ff4f794f" name="Default" comment="MPI_1 version 1.0">
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/../1/Alphas.mat" afterPath="$PROJECT_DIR$/../1/Alphas.mat" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/../1/Betas.mat" afterPath="$PROJECT_DIR$/../1/Betas.mat" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/../1/Gammas.mat" afterPath="$PROJECT_DIR$/../1/Gammas.mat" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/../1/Validation_mpi.cpp" afterPath="$PROJECT_DIR$/../1/Validation_mpi.cpp" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/../1/matrix" afterPath="$PROJECT_DIR$/../1/matrix" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/MPI-1.iml" afterPath="$PROJECT_DIR$/.idea/MPI-1.iml" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/../1/Reduction_mpi" afterPath="$PROJECT_DIR$/../1/Reduction_mpi" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/CMakeLists.txt" afterPath="$PROJECT_DIR$/CMakeLists.txt" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/main.cpp" afterPath="$PROJECT_DIR$/main.cpp" />
     </list>
     <ignored path="MPI-1.iws" />
@@ -54,8 +48,8 @@
       <file leaf-file-name="main.cpp" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/main.cpp">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="365">
-              <caret line="120" column="12" selection-start-line="120" selection-start-column="12" selection-end-line="120" selection-end-column="12" />
+            <state relative-caret-position="425">
+              <caret line="124" column="5" selection-start-line="124" selection-start-column="5" selection-end-line="124" selection-end-column="5" />
               <folding>
                 <element signature="e#0#19#0" expanded="true" />
               </folding>
@@ -504,8 +498,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/main.cpp">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="365">
-          <caret line="120" column="12" selection-start-line="120" selection-start-column="12" selection-end-line="120" selection-end-column="12" />
+        <state relative-caret-position="425">
+          <caret line="124" column="5" selection-start-line="124" selection-start-column="5" selection-end-line="124" selection-end-column="5" />
           <folding>
             <element signature="e#0#19#0" expanded="true" />
           </folding>

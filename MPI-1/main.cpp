@@ -117,8 +117,8 @@ int main(int argc, char *argv[]) {
         {
             printf("@@@ %d @@@ setting Irecv for %d\n", rank, i);
             MPI_Irecv(&Alphas[i * _size], _size, MPI_DOUBLE, i, 1, MPI_COMM_WORLD, &requests_a[i]);
-            MPI_Irecv(&Betas[i * _size], _size, MPI_DOUBLE, i, 2, MPI_COMM_WORLD, &requests_b[i]);
-            MPI_Irecv(&Gammas[i * _size], _size, MPI_DOUBLE, i, 3, MPI_COMM_WORLD, &requests_g[i]);
+            //MPI_Irecv(&Betas[i * _size], _size, MPI_DOUBLE, i, 2, MPI_COMM_WORLD, &requests_b[i]);
+            //MPI_Irecv(&Gammas[i * _size], _size, MPI_DOUBLE, i, 3, MPI_COMM_WORLD, &requests_g[i]);
             printf("@@@ %d @@@ Irecv for %d set!\n", rank, i);
         }
         printf("@@@ %d @@@ set Irecv!\n", rank);
