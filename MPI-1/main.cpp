@@ -95,7 +95,7 @@ int main(int argc, char *argv[]) {
     printf("@@@ %d @@@ Before Broadcast...\n", rank);
     MPI_Bcast(U_t, N * N, MPI_DOUBLE, MASTER, MPI_COMM_WORLD);
     printf("@@@ %d @@@ Broadcasting...\n", rank);
-    //MPI_Barrier(MPI_COMM_WORLD);    //同步所有进程,确保每个进程都拿到了数据之后在进行下一步
+    MPI_Barrier(MPI_COMM_WORLD);    //同步所有进程,确保每个进程都拿到了数据之后在进行下一步
     printf("@@@ %d @@@ Broadcasted!\n", rank);
 
     //每个rank计算几行,乘回去会大于M
@@ -116,9 +116,9 @@ int main(int argc, char *argv[]) {
         for(int i = 1; i < rank_size; i++)      //自己的不用收集,所以i从1开始
         {
             printf("@@@ %d @@@ setting Irecv for %d\n", rank, i);
-            MPI_Irecv(&Alphas[i * _size], _size, MPI_DOUBLE, i, 1, MPI_COMM_WORLD, &requests_a[i]);
-            MPI_Irecv(&Betas[i * _size], _size, MPI_DOUBLE, i, 2, MPI_COMM_WORLD, &requests_b[i]);
-            MPI_Irecv(&Gammas[i * _size], _size, MPI_DOUBLE, i, 3, MPI_COMM_WORLD, &requests_g[i]);
+            MPI_Irecv(&Alphas[i * _size], _size, MPI_DOUBLE, i, 1, MPI_COMM_WORLD, &requests_a[i-1]);
+            MPI_Irecv(&Betas[i * _size], _size, MPI_DOUBLE, i, 2, MPI_COMM_WORLD, &requests_b[i-1]);
+            MPI_Irecv(&Gammas[i * _size], _size, MPI_DOUBLE, i, 3, MPI_COMM_WORLD, &requests_g[i-1]);
             printf("@@@ %d @@@ Irecv for %d set!\n", rank, i);
         }
         printf("@@@ %d @@@ set Irecv!\n", rank);
@@ -145,7 +145,7 @@ int main(int argc, char *argv[]) {
                 {
                     alpha += U_t[i * N + k] * U_t[i * N + k];
                     beta += U_t[j * N + k] * U_t[j * N + k];
-                    gamma += U_t[i * N + k] * U_t[i * N + k];
+                    gamma += U_t[i * N + k] * U_t[j * N + k];
                 }
                 //三个结果矩阵视作M*M的矩阵,为了让行与行之间能在内存中连续存储,读取会更高效
                 Alphas[i * M + j] = alpha;
@@ -165,16 +165,16 @@ int main(int argc, char *argv[]) {
         printf("@@@ %d @@@ _size = %d\n", rank, _size);
         if (rank != rank_size - 1)      //如果不是最后一个进程,最后一个进程因为可能会有一部分是大于M的行
         {
-            MPI_Isend(&Alphas[1 * _size], _size, MPI_DOUBLE, MASTER, 1, MPI_COMM_WORLD, &a);
-            MPI_Isend(&Betas[1 * _size], _size, MPI_DOUBLE, MASTER, 2, MPI_COMM_WORLD, &b);
-            MPI_Isend(&Gammas[1 * _size], _size, MPI_DOUBLE, MASTER, 3, MPI_COMM_WORLD, &c);
+            MPI_Isend(&Alphas[rank * _size], _size, MPI_DOUBLE, MASTER, 1, MPI_COMM_WORLD, &a);
+            MPI_Isend(&Betas[rank * _size], _size, MPI_DOUBLE, MASTER, 2, MPI_COMM_WORLD, &b);
+            MPI_Isend(&Gammas[rank * _size], _size, MPI_DOUBLE, MASTER, 3, MPI_COMM_WORLD, &c);
         }
         else if (rank == rank_size - 1)     //最后一个进程
         {
             int __size = (M - rank * rowPerRank) * M;
-            MPI_Isend(&Alphas[1 * _size], __size, MPI_DOUBLE, MASTER, 1, MPI_COMM_WORLD, &a);
-            MPI_Isend(&Betas[1 * _size], __size, MPI_DOUBLE, MASTER, 2, MPI_COMM_WORLD, &b);
-            MPI_Isend(&Gammas[1 * _size], __size, MPI_DOUBLE, MASTER, 3, MPI_COMM_WORLD, &c);
+            MPI_Isend(&Alphas[rank * _size], __size, MPI_DOUBLE, MASTER, 1, MPI_COMM_WORLD, &a);
+            MPI_Isend(&Betas[rank * _size], __size, MPI_DOUBLE, MASTER, 2, MPI_COMM_WORLD, &b);
+            MPI_Isend(&Gammas[rank * _size], __size, MPI_DOUBLE, MASTER, 3, MPI_COMM_WORLD, &c);
         }
         printf("@@@ %d @@@ sending data\n", rank);
 
@@ -192,9 +192,9 @@ int main(int argc, char *argv[]) {
     //等待主进程收集完所有数据之后继续
     if (rank_size > 1)
     {
-        MPI_Waitall(rank_size, requests_a, MPI_STATUS_IGNORE);
-        MPI_Waitall(rank_size, requests_b, MPI_STATUS_IGNORE);
-        MPI_Waitall(rank_size, requests_g, MPI_STATUS_IGNORE);
+        MPI_Waitall(rank_size - 1, requests_a, MPI_STATUS_IGNORE);
+        MPI_Waitall(rank_size - 1, requests_b, MPI_STATUS_IGNORE);
+        MPI_Waitall(rank_size - 1, requests_g, MPI_STATUS_IGNORE);
     }
 
     gettimeofday(&end, NULL);
@@ -247,7 +247,8 @@ int main(int argc, char *argv[]) {
         //file for Matrix A
         Af.open("AlphasMPI.mat");
 
-        Af << M << "  " << N;
+        //这一行要注释掉才能通过验证，因为验证程序不会读取MPI输出的文件的这两个参数
+        //Af << M << "  " << N;
         for (int i = 0; i < M; i++)
         {
             for (int j = 0; j < N; j++)
