@@ -1,9 +1,11 @@
 /*
-gcc mandelbrot.c -lglut -lGLU -lGL
+gcc mandelbrot_omp.c -o mandelbrot_omp -lglut -lGLU -lGL -fopenmp
 */
 #include <stdlib.h>
 #include <GL/glut.h>
 #include <omp.h>
+#include <time.h>
+#include <stdio.h>
 
 /* Defaut data via command line */
 /* Can enter other values via command line arguments */
@@ -21,7 +23,7 @@ gcc mandelbrot.c -lglut -lGLU -lGL
 
 /* Number of threads*/
 
-#define NUM_THREADS 2
+#define NUM_THREADS 8
 
 float height = HEIGHT; /* size of window in complex plane */
 float width = WIDTH;
@@ -115,6 +117,8 @@ main(int argc, char *argv[])
     int i, j, k;
     float x, y, v;
     complex c0, c, d;
+    double elapsedTime;
+    struct timeval start, end;
 
     if(argc>1) cx = atof(argv[1]); /* center x */
     if(argc>2) cy = atof(argv[2]);  /* center y */
@@ -122,7 +126,8 @@ main(int argc, char *argv[])
     if(argc>4) max=atoi(argv[4]); /* maximum iterations */
 
     omp_set_num_threads(NUM_THREADS);
-    #pragma omp parallel for default(shared)
+    gettimeofday(&start, NULL);
+    #pragma omp parallel for default(shared) private(x, y, c, c0, v, j, d, k)   //Because these items are declared outside so we must use private explicitly
     for (i=0; i<n; i++)
         for(j=0; j<m; j++)
         {
@@ -149,6 +154,10 @@ main(int argc, char *argv[])
             if(v>1.0) v=1.0; /* clamp if > 1 */
             image[i][j]=255*v;
         }
+    gettimeofday(&end, NULL);
+    elapsedTime = (end.tv_sec - start.tv_sec) * 1000;
+    elapsedTime = (end.tv_usec - start.tv_usec) / 1000;
+    printf("OMP_Time: %f ms\n", elapsedTime);
 
 
     glutInit(&argc, argv);
