@@ -18,7 +18,7 @@ int main(int argc, char *argv[]) {
 
     string T, P, Db;
     M = atoi(argv[1]);
-    N = atoi(argv[2]);
+    N = atoi(argv[2]);	
 
     double elapsedTime, elapsedTime2;
     timeval start, end, end2;
