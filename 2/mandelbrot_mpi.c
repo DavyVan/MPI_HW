@@ -160,6 +160,7 @@ main(int argc, char *argv[])
     printf("OMP_Time: %f ms\n", elapsedTime);
 
 
+/*
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_SINGLE | GLUT_RGB );
     glutInitWindowSize(N, M);
@@ -169,6 +170,6 @@ main(int argc, char *argv[])
     glutDisplayFunc(display);
 
     glutMainLoop();
-
+*/
 
 }
