@@ -4,11 +4,14 @@
 #include<memory.h>
 #include<cmath>
 #include<iostream>
+#include<omp.h>
 
 using namespace std;
 
 #define MAX_ITERATION_NUM 100000
 #define EPSILON 1e-6
+
+#define OMP_THREADS_NUM 4
 
 int main(int argc, char* argv[])
 {
@@ -64,6 +67,7 @@ int main(int argc, char* argv[])
     {
         //compute Ap
         memset(Ap, 0, sizeof(double) * N);
+        #pragma omp parallel for
         for(int i = 0; i < N; i++)
         {
             for(int j = 0; j < N; j++)
@@ -75,6 +79,7 @@ int main(int argc, char* argv[])
         //compute alpha
         double pr = 0;
         double pAp = 0;
+        #pragma omp parallel for reduction(+ : pr) reduction(+ : pAp)
         for(int i = 0; i < N; i++)
         {
             pr += p[i] * r[i];
@@ -83,6 +88,7 @@ int main(int argc, char* argv[])
         alpha = pr / pAp;
 
         //compute x_k+1, r_k+1
+        #pragma omp parallel for
         for(int i = 0; i < N; i++)
         {
             x[i] += alpha * p[i];
@@ -91,6 +97,7 @@ int main(int argc, char* argv[])
 
         //compute res
         res = 0;
+        #pragma omp parallel for reduction(+ : res)
         for(int i = 0; i < N; i++)
         {
             res += abs(r[i]);
@@ -101,6 +108,7 @@ int main(int argc, char* argv[])
         //compute r
         double _r2 = r2;
         r2 = 0;
+        #pragma omp parallel for reduction(+ : r2)
         for(int i = 0; i < N; i++)
         {
             r2 += r[i] * r[i];
@@ -110,6 +118,7 @@ int main(int argc, char* argv[])
         beta = r2 / _r2;
 
         //compute p_k+1
+        #pragma omp parallel for
         for(int i = 0; i < N; i++)
         {
             p[i] = r[i] + beta * p[i];
@@ -118,7 +127,7 @@ int main(int argc, char* argv[])
     gettimeofday(&end, NULL);
     elapsedTime = (end.tv_sec - start.tv_sec) * 1000;
     elapsedTime += (end.tv_usec - start.tv_usec) / 1000;
-    printf("Serial Time: %fms\n", elapsedTime);
+    printf("OMP Time: %fms\n", elapsedTime);
 
     //release memory
     delete[] b;
