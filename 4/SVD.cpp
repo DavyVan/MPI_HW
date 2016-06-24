@@ -52,12 +52,12 @@ int main (int argc, char* argv[]){
           return 0;
   }
 
- 
+
   if(M != N){
           cout<<"Error: Matrix must be square";
           return 0;
   }
-  
+
   if(argc > 3){
 
     T = argv[3];
@@ -69,7 +69,7 @@ int main (int argc, char* argv[]){
     }
   }
  // cout<<T<<P<<endl;
-  
+
   double **U,**V, *S,**U_t, **V_t, **A;
   double alpha, beta, gamma, c, zeta, t,s,sub_zeta, converge;
 
@@ -111,7 +111,7 @@ int main (int argc, char* argv[]){
 
   matrixfile.close();
 
- 
+
   for(int i=0; i<M;i++){
     for(int j=0; j<N;j++){
 
@@ -126,7 +126,7 @@ int main (int argc, char* argv[]){
 
 
     //Store A for debug purpouse
-  
+
 
    for(int i=0; i<M;i++){
       for(int j=0; j<N;j++){
@@ -136,9 +136,9 @@ int main (int argc, char* argv[]){
     }
 
 
-  
 
-  
+
+
   /* SVD using Jacobi algorithm (Sequencial)*/
 
    gettimeofday(&start, NULL);
@@ -146,7 +146,7 @@ int main (int argc, char* argv[]){
    double conv;
    while(converge > epsilon){           //convergence
     converge = 0.0;
-   
+
     acum++;                             //counter of loops
     for(int i = 1; i<M; i++){
       for(int j = 0; j<i; j++){
@@ -171,7 +171,7 @@ int main (int argc, char* argv[]){
           t = sgn(zeta) / (abs(zeta) + sqrt(1.0 + (zeta*zeta)));        //compute tan of angle
           c = 1.0 / (sqrt (1.0 + (t*t)));                               //extract cos
           s = c*t;                                                      //extrac sin
- 
+
 
           //Apply rotations on U and V
 
@@ -219,14 +219,14 @@ int main (int argc, char* argv[]){
 // fix final result
 
   for(int i =0; i<M; i++){
-    
+
     for(int j =0; j<N; j++){
 
       U[i][j] = U_t[j][i];
       V[i][j] = V_t[j][i];
-      
+
     }
-    
+
   }
 
 
@@ -284,7 +284,7 @@ int main (int argc, char* argv[]){
 
     ofstream Af;
     //file for Matrix A
-    Af.open("matrixA.mat"); 
+    Af.open("matrixA.mat");
     //Af<<"# Created from debug\n# name: A\n# type: matrix\n# rows: "<<M<<"\n# columns: "<<N<<"\n";
 
 
@@ -294,15 +294,15 @@ int main (int argc, char* argv[]){
       }
       Af<<"\n";
     }
-    
+
     Af.close();
 
     ofstream Uf;
 
     //File for Matrix U
-    Uf.open("matrixUcpu.mat");
+    Uf.open("matrixUcpu");
     //Uf<<"# Created from debug\n# name: Ucpu\n# type: matrix\n# rows: "<<M<<"\n# columns: "<<N<<"\n";
-    Uf<<M<<' '<<N<<endl; 
+    Uf<<M<<' '<<N<<endl;
     for(int i = 0; i<M;i++){
       for(int j =0; j<N;j++){
         Uf<<" "<<U[i][j];
@@ -313,7 +313,7 @@ int main (int argc, char* argv[]){
 
     ofstream Vf;
     //File for Matrix V
-    Vf.open("matrixVcpu.mat");
+    Vf.open("matrixVcpu");
     //Vf<<"# Created from debug\n# name: Vcpu\n# type: matrix\n# rows: "<<M<<"\n# columns: "<<N<<"\n";
 
     for(int i = 0; i<M;i++){
@@ -322,16 +322,16 @@ int main (int argc, char* argv[]){
       }
       Vf<<"\n";
     }
-    
+
 
     Vf.close();
 
     ofstream Sf;
     //File for Matrix S
-    Sf.open("matrixScpu.mat");
+    Sf.open("matrixScpu");
     //Sf<<"# Created from debug\n# name: Scpu\n# type: matrix\n# rows: "<<M<<"\n# columns: "<<N<<"\n";
 
-    
+
     for(int i = 0; i<M;i++){
       for(int j =0; j<N;j++){
         if(i == j){
@@ -345,7 +345,7 @@ int main (int argc, char* argv[]){
       }
       Sf<<"\n";
     }
-    
+
 
     Sf.close();
 

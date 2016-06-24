@@ -30,9 +30,7 @@
 
 #define epsilon 1.e-8
 
-#ifndef N_THREAD
-#define N_THREAD 4
-#endif
+#define OMP_THREADS_NUM 4
 
 
 using namespace std;
@@ -42,8 +40,9 @@ template <typename T> double sgn(T val)
     return (val > T(0)) - (val < T(0));
 }
 
-int main (int argc, char* argv[]){
-    omp_set_num_threads(N_THREAD);
+int main (int argc, char* argv[])
+{
+    omp_set_num_threads(OMP_THREADS_NUM);
     int M,N;
 
     string T,P,Db;
@@ -53,23 +52,28 @@ int main (int argc, char* argv[]){
     double elapsedTime,elapsedTime2;
     timeval start,end,end2;
 
-    if(argc < 4){
+    if(argc < 4)
+    {
         cout<<"Please input the size of Matrix and at least one of the options: -t -p -d";
         return 0;
     }
 
 
-    if(M != N){
+    if(M != N)
+    {
         cout<<"Error: Matrix must be square";
         return 0;
     }
 
-    if(argc > 3){
+    if(argc > 3)
+    {
 
         T = argv[3];
-        if(argc > 4){
+        if(argc > 4)
+        {
             P = argv[4];
-            if(argc > 5){
+            if(argc > 5)
+            {
                 Db = argv[5];
             }
         }
@@ -90,7 +94,8 @@ int main (int argc, char* argv[]){
     A = new double*[N];
     S = new double[N];
 
-    for(int i =0; i<N; i++){
+    for(int i =0; i<N; i++)
+    {
         U[i] = new double[N];
         V[i] = new double[N];
         U_t[i] = new double[N];
@@ -103,28 +108,32 @@ int main (int argc, char* argv[]){
     //Already transposed
 
     ifstream matrixfile("matrix");
-    if(!(matrixfile.is_open())){
+    if(!(matrixfile.is_open()))
+    {
         cout<<"Error: file not found"<<endl;
         return 0;
     }
 
-    for(int i = 0; i < M; i++){
-        for(int j =0; j < N; j++){
-
+    for(int i = 0; i < M; i++)
+    {
+        for(int j =0; j < N; j++)
+        {
             matrixfile >> U_t[i][j];
         }
     }
 
     matrixfile.close();
 
-
-    for(int i=0; i<M;i++){
-        for(int j=0; j<N;j++){
-
-            if(i==j){
+    for(int i=0; i<M; i++)
+    {
+        for(int j=0; j<N; j++)
+        {
+            if(i==j)
+            {
                 V_t[i][j] = 1.0;
             }
-            else{
+            else
+            {
                 V_t[i][j] = 0.0;
             }
         }
@@ -134,9 +143,10 @@ int main (int argc, char* argv[]){
     //Store A for debug purpouse
 
 
-    for(int i=0; i<M;i++){
-        for(int j=0; j<N;j++){
-
+    for(int i=0; i<M; i++)
+    {
+        for(int j=0; j<N; j++)
+        {
             A[i][j] = U_t[j][i];
         }
     }
@@ -150,41 +160,37 @@ int main (int argc, char* argv[]){
     gettimeofday(&start, NULL);
 
     double conv;
-    while(converge > epsilon){          //convergence
+    while(converge > epsilon)           //convergence
+    {
         converge = 0.0;
 
-        acum++;                         //counter of loops
-        /* Block
-         * diff = 1
-         * (0 1) | (2 3) | (3 5) ...
-         * (1 2) | (3 4) | (5 6)...
-         * diff = 2
-         * (0 2) (1 3) | (4 6) ...
-         * (2 4) (3 5) | (6 8)...
-         * diff = 3
-         * (0 3) (1 4) (2 5) | ...
-         * (3 6) (4 7) (5 8) | ...
-         */
-        for (int diff = 1; diff < M; diff ++) {
+        acum++;
+        //counter of loops
+        for (int diff = 1; diff < M; diff ++)
+        {
             int P1[M], P2[M];
             int r1 = 0, r2 = 0;
-            for (int i = 0; i < M - diff; i++) {
+            for (int i = 0; i < M - diff; i++)
+            {
                 if (i % (2 * diff) < diff)
                     P1[r1++] = i;
                 else
                     P2[r2++] = i;
             }
-            double converges[N_THREAD];
-            for (int i = 0; i < N_THREAD; i++) {
+            double converges[OMP_THREADS_NUM];
+            for (int i = 0; i < OMP_THREADS_NUM; i++)
+            {
                 converges[i] = converge;
             }
-#pragma omp parallel for
-            for (int p = 0; p < r1; p++){
+            #pragma omp parallel for
+            for (int p = 0; p < r1; p++)
+            {
                 int id = omp_get_thread_num();
                 int j = P1[p], i = j + diff;
                 double alpha = 0, beta = 0, gamma = 0;
                 double zeta, t, c, s;
-                for (int k = 0; k < N; k++) {
+                for (int k = 0; k < N; k++)
+                {
                     alpha = alpha + (U_t[i][k] * U_t[i][k]);
                     beta = beta + (U_t[j][k] * U_t[j][k]);
                     gamma = gamma + (U_t[i][k] * U_t[j][k]);
@@ -199,7 +205,8 @@ int main (int argc, char* argv[]){
                 t = sgn(zeta) / (abs(zeta) + sqrt(1.0 + (zeta*zeta)));        //compute tan of angle
                 c = 1.0 / (sqrt (1.0 + (t*t)));                         //extract cos
                 s = c*t;                                                        //extrac sin
-                for(int k=0; k<N; k++){
+                for(int k=0; k<N; k++)
+                {
                     t = U_t[i][k];
                     U_t[i][k] = c*t - s*U_t[j][k];
                     U_t[j][k] = s*t + c*U_t[j][k];
@@ -210,13 +217,15 @@ int main (int argc, char* argv[]){
 
                 }
             }
-#pragma omp parallel for
-            for (int p = 0; p < r2; p++){
+            #pragma omp parallel for
+            for (int p = 0; p < r2; p++)
+            {
                 int id = omp_get_thread_num();
                 int j = P2[p], i = j + diff;
                 double alpha = 0, beta = 0, gamma = 0;
                 double zeta, t, c, s;
-                for (int k = 0; k < N; k++) {
+                for (int k = 0; k < N; k++)
+                {
                     alpha = alpha + (U_t[i][k] * U_t[i][k]);
                     beta = beta + (U_t[j][k] * U_t[j][k]);
                     gamma = gamma + (U_t[i][k] * U_t[j][k]);
@@ -231,7 +240,8 @@ int main (int argc, char* argv[]){
                 t = sgn(zeta) / (abs(zeta) + sqrt(1.0 + (zeta*zeta)));        //compute tan of angle
                 c = 1.0 / (sqrt (1.0 + (t*t)));                         //extract cos
                 s = c*t;                                                        //extrac sin
-                for(int k=0; k<N; k++){
+                for(int k=0; k<N; k++)
+                {
                     t = U_t[i][k];
                     U_t[i][k] = c*t - s*U_t[j][k];
                     U_t[j][k] = s*t + c*U_t[j][k];
@@ -242,7 +252,7 @@ int main (int argc, char* argv[]){
 
                 }
             }
-            for (int i = 0; i < N_THREAD; i++)
+            for (int i = 0; i < OMP_THREADS_NUM; i++)
                 converge = max(converge, converges[i]);
         }
     }
@@ -250,17 +260,21 @@ int main (int argc, char* argv[]){
 
     //Create matrix S
 
-    for(int i =0; i<M; i++){
+    for(int i =0; i<M; i++)
+    {
 
         double t=0;
-        for(int j=0; j<N;j++){
+        for(int j=0; j<N; j++)
+        {
             t=t + pow(U_t[i][j],2);
         }
         t = sqrt(t);
 
-        for(int j=0; j<N;j++){
+        for(int j=0; j<N; j++)
+        {
             U_t[i][j] = U_t[i][j] / t;
-            if(i == j){
+            if(i == j)
+            {
                 S[i] = t;
             }
         }
@@ -275,9 +289,11 @@ int main (int argc, char* argv[]){
 
     // fix final result
 
-    for(int i =0; i<M; i++){
+    for(int i =0; i<M; i++)
+    {
 
-        for(int j =0; j<N; j++){
+        for(int j =0; j<N; j++)
+        {
 
             U[i][j] = U_t[j][i];
             V[i][j] = V_t[j][i];
@@ -290,7 +306,8 @@ int main (int argc, char* argv[]){
     //Output time and iterations
 
 
-    if(T=="-t" || P =="-t"){
+    if(T=="-t" || P =="-t")
+    {
         cout<<"iterations: "<<acum<<endl;
         elapsedTime = (end.tv_sec - start.tv_sec) * 1000.0;
         elapsedTime += (end.tv_usec - start.tv_usec) / 1000.0;
@@ -301,10 +318,13 @@ int main (int argc, char* argv[]){
 
 
     // Output the matrixes for debug
-    if(T== "-p" || P == "-p"){
+    if(T== "-p" || P == "-p")
+    {
         cout<<"U"<<endl<<endl;
-        for(int i =0; i<M; i++){
-            for(int j =0; j<N; j++){
+        for(int i =0; i<M; i++)
+        {
+            for(int j =0; j<N; j++)
+            {
 
                 cout<<U[i][j]<<"  ";
             }
@@ -312,8 +332,10 @@ int main (int argc, char* argv[]){
         }
 
         cout<<endl<<"V"<<endl<<endl;
-        for(int i =0; i<M; i++){
-            for(int j =0; j<N; j++){
+        for(int i =0; i<M; i++)
+        {
+            for(int j =0; j<N; j++)
+            {
 
                 cout<<V[i][j]<<"  ";
             }
@@ -321,12 +343,18 @@ int main (int argc, char* argv[]){
         }
 
         cout<<endl<<"S"<<endl<<endl;
-        for(int i =0; i<M; i++){
-            for(int j =0; j<N; j++){
+        for(int i =0; i<M; i++)
+        {
+            for(int j =0; j<N; j++)
+            {
 
-                if(i==j){  cout<<S[i]<<"  ";}
+                if(i==j)
+                {
+                    cout<<S[i]<<"  ";
+                }
 
-                else{
+                else
+                {
                     cout<<"0.0  ";
                 }
             }
@@ -336,17 +364,20 @@ int main (int argc, char* argv[]){
     }
 
     //Generate Octave files for debug purpouse
-    if(Db == "-d" || T == "-d" || P == "-d"){
+    if(Db == "-d" || T == "-d" || P == "-d")
+    {
 
 
         ofstream Af;
         //file for Matrix A
-        Af.open("matrixA.mat"); 
+        Af.open("matrixA.mat");
         Af<<"# Created from debug\n# name: A\n# type: matrix\n# rows: "<<M<<"\n# columns: "<<N<<"\n";
 
 
-        for(int i = 0; i<M;i++){
-            for(int j =0; j<N;j++){
+        for(int i = 0; i<M; i++)
+        {
+            for(int j =0; j<N; j++)
+            {
                 Af<<" "<<A[i][j];
             }
             Af<<"\n";
@@ -357,11 +388,13 @@ int main (int argc, char* argv[]){
         ofstream Uf;
 
         //File for Matrix U
-        Uf.open("matrixUomp.mat");
+        Uf.open("matrixUomp");
         //Uf<<"# Created from debug\n# name: Ucpu\n# type: matrix\n# rows: "<<M<<"\n# columns: "<<N<<"\n";
 
-        for(int i = 0; i<M;i++){
-            for(int j =0; j<N;j++){
+        for(int i = 0; i<M; i++)
+        {
+            for(int j =0; j<N; j++)
+            {
                 Uf<<" "<<U[i][j];
             }
             Uf<<"\n";
@@ -370,11 +403,13 @@ int main (int argc, char* argv[]){
 
         ofstream Vf;
         //File for Matrix V
-        Vf.open("matrixVomp.mat");
+        Vf.open("matrixVomp");
         //Vf<<"# Created from debug\n# name: Vcpu\n# type: matrix\n# rows: "<<M<<"\n# columns: "<<N<<"\n";
 
-        for(int i = 0; i<M;i++){
-            for(int j =0; j<N;j++){
+        for(int i = 0; i<M; i++)
+        {
+            for(int j =0; j<N; j++)
+            {
                 Vf<<" "<<V[i][j];
             }
             Vf<<"\n";
@@ -385,18 +420,22 @@ int main (int argc, char* argv[]){
 
         ofstream Sf;
         //File for Matrix S
-        Sf.open("matrixSomp.mat");
+        Sf.open("matrixSomp");
         //Sf<<"# Created from debug\n# name: Scpu\n# type: matrix\n# rows: "<<M<<"\n# columns: "<<N<<"\n";
 
 
-        for(int i = 0; i<M;i++){
-            for(int j =0; j<N;j++){
-                if(i == j){
+        for(int i = 0; i<M; i++)
+        {
+            for(int j =0; j<N; j++)
+            {
+                if(i == j)
+                {
                     Sf<<" "<<S[i];
 
                 }
 
-                else{
+                else
+                {
                     Sf<<" 0.0";
                 }
             }
@@ -410,7 +449,8 @@ int main (int argc, char* argv[]){
     }
 
     delete [] S;
-    for(int i = 0; i<N;i++){
+    for(int i = 0; i<N; i++)
+    {
         delete [] A[i];
         delete [] U[i];
         delete [] V[i];
