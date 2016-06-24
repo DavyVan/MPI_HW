@@ -1,7 +1,7 @@
 /************************************************************************************************/
 /* SVD Using Jacobis Rotations                                                                  */
 /*                                                                                              */
-/* Compile: g++ -O3 SVD.cpp -o SVD                                                              */
+/* Compile: g++ -fopenmp -O3 SVD.cpp -o SVD                                                             */
 /* Arguments:                                                                                   */
 /*                                                                                              */
 /*      M = # of columns                                                                        */
@@ -13,10 +13,10 @@
 /*      -p = print out Results (U, S, V)                                                        */
 /*      -d = Generate the Octave files for debug and verify correctness                         */
 /*                                                                                              */
-/* Use: ./SVD M N -t -p -d                                                                      */
+/* Use: ./SVD M N num_threads -t -p -d                                                                  */
 /*                                                                                              */
-/* All arguments aren't important, just M and N. If you want, is possible to do                 */
-/* ./SVD M N -t and only print out the timing. As well you can use ./SVD M N -d for debug.      */
+/* All arguments aren't important, just M, N and num_threads. If you want, is possible to do            */
+/* ./SVD M N num_threads -t and only print out the timing. As well you can use ./SVD M N num_threads -d for debug.      */
 /************************************************************************************************/
 
 #include <iostream>
@@ -38,18 +38,22 @@ template <typename T> double sgn(T val)
 }
 
 int main (int argc, char* argv[]){
-    //omp_set_num_threads(2);
 
   int M,N;
+  int num_threads = omp_get_num_procs();
 
   string T,P,Db;
   M = atoi(argv[1]);
   N = atoi(argv[2]);
+  int num = atoi(argv[3]);
+  if(num < num_threads){
+      num_threads = num;
+  }
 
   double elapsedTime,elapsedTime2;
   timeval start,end,end2;
 
-  if(argc < 4){
+  if(argc < 5){
           cout<<"Please input the size of Matrix and at least one of the options: -t -p -d";
           return 0;
   }
@@ -60,20 +64,20 @@ int main (int argc, char* argv[]){
           return 0;
   }
   
-  if(argc > 3){
+  if(argc > 4){
 
-    T = argv[3];
-    if(argc > 4){
-      P = argv[4];
-      if(argc > 5){
-        Db = argv[5];
+    T = argv[4];
+    if(argc > 5){
+      P = argv[5];
+      if(argc > 6){
+        Db = argv[6];
       }
     }
   }
  // cout<<T<<P<<endl;
   
   double **U,**V, *S,**U_t, **V_t, **A;
-  double sub_zeta, converge;
+  double alpha, beta, gamma, c, zeta, t,s,sub_zeta, converge;
 
   int acum = 0;
   int temp1, temp2;
@@ -114,6 +118,7 @@ int main (int argc, char* argv[]){
   matrixfile.close();
 
  
+  //#pragma omp parallel for num_threads(num_threads)
   for(int i=0; i<M;i++){
     for(int j=0; j<N;j++){
 
@@ -130,6 +135,7 @@ int main (int argc, char* argv[]){
     //Store A for debug purpouse
   
 
+//#pragma omp parallel for num_threads(num_threads)
    for(int i=0; i<M;i++){
       for(int j=0; j<N;j++){
 
@@ -145,34 +151,23 @@ int main (int argc, char* argv[]){
 
    gettimeofday(&start, NULL);
 
-   int MM = M;
-   if (MM % 2 != 0) MM++;
-   int *num = new int[MM];
-   for (int i = 0; i < MM / 2; i++) num[i] = 2 * i;
-   for (int i = MM / 2; i < MM; i++) num[i] = num[i - MM / 2] + 1;
-
    double conv;
    while(converge > epsilon){           //convergence
     converge = 0.0;
    
     acum++;                             //counter of loops
-
-    for(int round = 0; round<MM-1; round++){
-#pragma omp parallel for
-      for(int step = 0; step<MM / 2; step++){
-          int i = num[step];
-          int j = num[step + MM / 2];
-          if (j >= M) continue;
+    for(int i = 1; i<M; i++){
+      for(int j = 0; j<i; j++){
 
 
-          double alpha = 0.0;
-          double beta = 0.0;
-          double gamma = 0.0;
-
+          alpha = 0.0;
+          beta = 0.0;
+          gamma = 0.0;
+        #pragma omp parallel for reduction(+ : alpha, beta, gamma) num_threads(num_threads)
           for(int k = 0; k<N ; k++){
-            alpha += (U_t[i][k] * U_t[i][k]);
-            beta += (U_t[j][k] * U_t[j][k]);
-            gamma += (U_t[i][k] * U_t[j][k]);
+            alpha = alpha + (U_t[i][k] * U_t[i][k]);
+            beta = beta + (U_t[j][k] * U_t[j][k]);
+            gamma = gamma + (U_t[i][k] * U_t[j][k]);
           }
 
           converge = max(converge, abs(gamma)/sqrt(alpha*beta));        //compute convergence
@@ -180,15 +175,15 @@ int main (int argc, char* argv[]){
                                                                         //between column i and j
 
 
-          double zeta = (beta - alpha) / (2.0 * gamma);
-          double t = sgn(zeta) / (abs(zeta) + sqrt(1.0 + (zeta*zeta)));        //compute tan of angle
-          double c = 1.0 / (sqrt (1.0 + (t*t)));                                //extract cos
-          double s = c*t;                                                       //extrac sin
+          zeta = (beta - alpha) / (2.0 * gamma);
+          t = sgn(zeta) / (abs(zeta) + sqrt(1.0 + (zeta*zeta)));        //compute tan of angle
+          c = 1.0 / (sqrt (1.0 + (t*t)));                               //extract cos
+          s = c*t;                                                      //extrac sin
  
 
           //Apply rotations on U and V
-
-          for(int k=0; k<N; k++){
+        #pragma omp parallel for private(t) num_threads(num_threads)
+                for(int k=0; k<N; k++){
             t = U_t[i][k];
             U_t[i][k] = c*t - s*U_t[j][k];
             U_t[j][k] = s*t + c*U_t[j][k];
@@ -197,29 +192,19 @@ int main (int argc, char* argv[]){
             V_t[i][k] = c*t - s*V_t[j][k];
             V_t[j][k] = s*t + c*V_t[j][k];
 
-          }
+        }
 
       }
-
-      int step_MM_2 = num[MM / 2 - 1];
-      for (int step = MM / 2 - 1; step > 0; step--) {
-          num[step] = num[step - 1];
-      }
-      num[0] = num[MM / 2];
-      for (int step = MM / 2; step < MM - 2; step++) {
-          num[step] = num[step + 1];
-      }
-      num[MM - 2] = step_MM_2;
     }
  }
 
 
   //Create matrix S
 
-#pragma omp parallel for
+#pragma omp parallel for private(t) num_threads(num_threads)
   for(int i =0; i<M; i++){
 
-    double t=0;
+    t=0;
     for(int j=0; j<N;j++){
       t=t + pow(U_t[i][j],2);
     }
@@ -324,10 +309,9 @@ int main (int argc, char* argv[]){
     ofstream Uf;
 
     //File for Matrix U
-    Uf.open("matrixUomp");
+    Uf.open("matrixUomp.mat");
     //Uf<<"# Created from debug\n# name: Ucpu\n# type: matrix\n# rows: "<<M<<"\n# columns: "<<N<<"\n";
-
-    
+//    Uf<<M<<' '<<N<<endl; 
     for(int i = 0; i<M;i++){
       for(int j =0; j<N;j++){
         Uf<<" "<<U[i][j];
@@ -338,7 +322,7 @@ int main (int argc, char* argv[]){
 
     ofstream Vf;
     //File for Matrix V
-    Vf.open("matrixVomp");
+    Vf.open("matrixVomp.mat");
     //Vf<<"# Created from debug\n# name: Vcpu\n# type: matrix\n# rows: "<<M<<"\n# columns: "<<N<<"\n";
 
     for(int i = 0; i<M;i++){
@@ -353,7 +337,7 @@ int main (int argc, char* argv[]){
 
     ofstream Sf;
     //File for Matrix S
-    Sf.open("matrixSomp");
+    Sf.open("matrixSomp.mat");
     //Sf<<"# Created from debug\n# name: Scpu\n# type: matrix\n# rows: "<<M<<"\n# columns: "<<N<<"\n";
 
     

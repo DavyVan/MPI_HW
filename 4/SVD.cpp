@@ -1,22 +1,22 @@
 /************************************************************************************************/
-/* SVD Using Jacobis Rotations									*/
-/*												*/
-/* Compile: g++ -O3 SVD.cpp -o SVD								*/
-/* Arguments:											*/
-/*												*/
-/*	M = # of columns									*/
-/*	N = # of Rows										*/
-/*												*/
-/*	Matrix must be squared (M=N)								*/
-/*												*/
-/*	-t = print out Timing and # of Iterations						*/
-/*	-p = print out Results (U, S, V)							*/
-/*	-d = Generate the Octave files for debug and verify correctness				*/
-/*												*/
-/* Use:	./SVD M N -t -p -d									*/
-/*												*/
-/* All arguments aren't important, just M and N. If you want, is possible to do 		*/
-/* ./SVD M N -t and only print out the timing. As well you can use ./SVD M N -d for debug.	*/
+/* SVD Using Jacobis Rotations                                                                  */
+/*                                                                                              */
+/* Compile: g++ -O3 SVD.cpp -o SVD                                                              */
+/* Arguments:                                                                                   */
+/*                                                                                              */
+/*      M = # of columns                                                                        */
+/*      N = # of Rows                                                                           */
+/*                                                                                              */
+/*      Matrix must be squared (M=N)                                                            */
+/*                                                                                              */
+/*      -t = print out Timing and # of Iterations                                               */
+/*      -p = print out Results (U, S, V)                                                        */
+/*      -d = Generate the Octave files for debug and verify correctness                         */
+/*                                                                                              */
+/* Use: ./SVD M N -t -p -d                                                                      */
+/*                                                                                              */
+/* All arguments aren't important, just M and N. If you want, is possible to do                 */
+/* ./SVD M N -t and only print out the timing. As well you can use ./SVD M N -d for debug.      */
 /************************************************************************************************/
 
 #include <iostream>
@@ -48,14 +48,14 @@ int main (int argc, char* argv[]){
   timeval start,end,end2;
 
   if(argc < 4){
-	  cout<<"Please input the size of Matrix and at least one of the options: -t -p -d";
-	  return 0;
+          cout<<"Please input the size of Matrix and at least one of the options: -t -p -d";
+          return 0;
   }
 
  
   if(M != N){
-	  cout<<"Error: Matrix must be square";
-	  return 0;
+          cout<<"Error: Matrix must be square";
+          return 0;
   }
   
   if(argc > 3){
@@ -85,11 +85,11 @@ int main (int argc, char* argv[]){
   S = new double[N];
 
   for(int i =0; i<N; i++){
-	U[i] = new double[N];
- 	V[i] = new double[N];
-	U_t[i] = new double[N];
-	V_t[i] = new double[N];
-	A[i] = new double[N];
+        U[i] = new double[N];
+        V[i] = new double[N];
+        U_t[i] = new double[N];
+        V_t[i] = new double[N];
+        A[i] = new double[N];
   }
 
 
@@ -144,11 +144,10 @@ int main (int argc, char* argv[]){
    gettimeofday(&start, NULL);
 
    double conv;
-   while(converge > epsilon){ 		//convergence
-    converge = 0.0;	
-   		
-    acum++;				//counter of loops
-
+   while(converge > epsilon){           //convergence
+    converge = 0.0;
+   
+    acum++;                             //counter of loops
     for(int i = 1; i<M; i++){
       for(int j = 0; j<i; j++){
 
@@ -163,20 +162,20 @@ int main (int argc, char* argv[]){
             gamma = gamma + (U_t[i][k] * U_t[j][k]);
           }
 
-          converge = max(converge, abs(gamma)/sqrt(alpha*beta));	//compute convergence
-	  								//basicaly is the angle
-									//between column i and j
+          converge = max(converge, abs(gamma)/sqrt(alpha*beta));        //compute convergence
+                                                                        //basicaly is the angle
+                                                                        //between column i and j
 
 
           zeta = (beta - alpha) / (2.0 * gamma);
           t = sgn(zeta) / (abs(zeta) + sqrt(1.0 + (zeta*zeta)));        //compute tan of angle
-          c = 1.0 / (sqrt (1.0 + (t*t)));				//extract cos
-          s = c*t;							//extrac sin
+          c = 1.0 / (sqrt (1.0 + (t*t)));                               //extract cos
+          s = c*t;                                                      //extrac sin
  
 
-	  //Apply rotations on U and V
+          //Apply rotations on U and V
 
-  	  for(int k=0; k<N; k++){
+                for(int k=0; k<N; k++){
             t = U_t[i][k];
             U_t[i][k] = c*t - s*U_t[j][k];
             U_t[j][k] = s*t + c*U_t[j][k];
@@ -185,7 +184,7 @@ int main (int argc, char* argv[]){
             V_t[i][k] = c*t - s*V_t[j][k];
             V_t[j][k] = s*t + c*V_t[j][k];
 
-          }
+        }
 
       }
     }
@@ -269,9 +268,9 @@ int main (int argc, char* argv[]){
     for(int j =0; j<N; j++){
 
        if(i==j){  cout<<S[i]<<"  ";}
-	
+
        else{
-	       cout<<"0.0  ";
+               cout<<"0.0  ";
        }
     }
     cout<<endl;
@@ -286,7 +285,7 @@ int main (int argc, char* argv[]){
     ofstream Af;
     //file for Matrix A
     Af.open("matrixA.mat"); 
-    Af<<"# Created from debug\n# name: A\n# type: matrix\n# rows: "<<M<<"\n# columns: "<<N<<"\n";
+    //Af<<"# Created from debug\n# name: A\n# type: matrix\n# rows: "<<M<<"\n# columns: "<<N<<"\n";
 
 
     for(int i = 0; i<M;i++){
@@ -302,8 +301,8 @@ int main (int argc, char* argv[]){
 
     //File for Matrix U
     Uf.open("matrixUcpu.mat");
-    Uf<<"# Created from debug\n# name: Ucpu\n# type: matrix\n# rows: "<<M<<"\n# columns: "<<N<<"\n";
-    
+    //Uf<<"# Created from debug\n# name: Ucpu\n# type: matrix\n# rows: "<<M<<"\n# columns: "<<N<<"\n";
+    Uf<<M<<' '<<N<<endl; 
     for(int i = 0; i<M;i++){
       for(int j =0; j<N;j++){
         Uf<<" "<<U[i][j];
@@ -315,7 +314,7 @@ int main (int argc, char* argv[]){
     ofstream Vf;
     //File for Matrix V
     Vf.open("matrixVcpu.mat");
-    Vf<<"# Created from debug\n# name: Vcpu\n# type: matrix\n# rows: "<<M<<"\n# columns: "<<N<<"\n";
+    //Vf<<"# Created from debug\n# name: Vcpu\n# type: matrix\n# rows: "<<M<<"\n# columns: "<<N<<"\n";
 
     for(int i = 0; i<M;i++){
       for(int j =0; j<N;j++){
@@ -330,7 +329,7 @@ int main (int argc, char* argv[]){
     ofstream Sf;
     //File for Matrix S
     Sf.open("matrixScpu.mat");
-    Sf<<"# Created from debug\n# name: Scpu\n# type: matrix\n# rows: "<<M<<"\n# columns: "<<N<<"\n";
+    //Sf<<"# Created from debug\n# name: Scpu\n# type: matrix\n# rows: "<<M<<"\n# columns: "<<N<<"\n";
 
     
     for(int i = 0; i<M;i++){
@@ -355,18 +354,12 @@ int main (int argc, char* argv[]){
 
    delete [] S;
    for(int i = 0; i<N;i++){
-	   delete [] A[i];
-	   delete [] U[i];
-	   delete [] V[i];
-	   delete [] U_t[i];
-	   delete [] V_t[i];
+           delete [] A[i];
+           delete [] U[i];
+           delete [] V[i];
+           delete [] U_t[i];
+           delete [] V_t[i];
    }
 
   return 0;
 }
-
-
-
-
-
-
